@@ -23,6 +23,24 @@ import sys
 PROJ = r"E:\PlantDiseaseProject"
 MODELS = os.path.join(PROJ, "models")
 
+# C 数组符号名 —— 必须与原训练脚本保持一致，否则固件 #include 后链接失败。
+# 来源：train_cls_int8.py -> g_weed_cls_model
+#       train_cls_int8_c8.py -> g_weed_cls_c8_model
+#不要凭文件名自动推导，weed_cls_c8_int8 的正确符号是 g_weed_cls_c8_model（没有 _int8）。
+SYMBOLS = {
+    "weed_cls_int8": "g_weed_cls_model",
+    "weed_cls_c8_int8": "g_weed_cls_c8_model",
+    "weed_cls_c8rgb_int8": "g_weed_cls_c8rgb_model",
+}
+
+
+def symbol_for(name):
+    if name in SYMBOLS:
+        return SYMBOLS[name]
+    if name.startswith("weed_cls"):
+        return "g_" + name.replace("weed_cls_", "weed_cls_") + "_model"
+    return f"g_{name}_model"
+
 
 def md5b(b):
     return hashlib.md5(b).hexdigest()
@@ -96,8 +114,7 @@ def one(path, write=True):
 
     if not write:
         return
-    suffix = name.replace("weed_cls_", "")
-    symbol = f"g_weed_cls_{suffix}_model" if name.startswith("weed_cls") else f"g_{name}_model"
+    symbol = symbol_for(name)
     cc, hh = to_cc(raw, name, symbol, f"{name} int8 模型")
     with open(cc_p, "w", encoding="utf-8") as f:
         f.write(cc)

@@ -116,6 +116,55 @@ python _toolchain/tflite_to_cc.py
 
 ---
 
+## 📊 int8 分类模型（单片机端）
+
+检测框裁剪出贴图后做 crop/weed 二分类，用于确认打击目标。
+
+### 为什么需要重训 + 加权
+
+用本仓库数据集裁出的贴图**严重失衡**（作物在田间图里本来就少）：
+
+| 划分 | crop | weed | 比例 |
+|---|---|---|---|
+| train | 371 | 6380 | **17 : 1** |
+| val | 35 | 1038 | **30 : 1** |
+
+直接用原`train_cls_int8.py` 训练会得到"看起来很好、实际危险"的模型：
+weed 召回 99.8%，但**误打作物率 34.3%**（1/3 作物会被激光打），
+平衡准确率 82.8% 与旧模型 83.1% 持平 —— 等于把错误从"漏打杂草"搬到了"打坏作物"。
+
+`_toolchain/train_cls_int8_balanced.py` 保持模型结构 / 量化方式 / C 符号名不变，
+只改训练侧：`class_weight` 取样本数反比 + 少数类水平翻转增广。
+
+### 三个模型的逐类对比（验证集 1073 张）
+
+| 模型 | 输入 | weed 召回 | crop 召回 | **误打作物** | **漏打杂草** | **平衡准确率** | Flash | C8T6 |
+|---|---|---|---|---|---|---|---|---|
+| 交付包旧模型 | — | 80.5% | 85.7% | 14.3% | 19.5% | 83.1% | — | — |
+| 原脚本直训 | 96×96 | 99.8% | 65.7% | 34.3% | 0.2% | 82.8% | 34.7 KB | ❌ 超限 |
+| **加权 48×48** ⭐ | 48×48 | 98.9% | 77.1% | **22.9%** | **1.1%** | **88.0%** | 14.0 KB | ✅ **OK** |
+| 加权 96×96 | 96×96 | 99.9% | 71.4% | 28.6% | 0.1% | 85.7% | 34.7 KB | ❌ 超限 |
+
+> **推荐用 `weed_cls_c8_int8`（48×48）**：平衡准确率最高（88.0%），且 Flash 14 KB /
+> 峰值张量 9.2 KB，**能塞进 STM32F103C8T6 的 64K Flash + 20K SRAM**。
+> 96×96 版峰值张量 144 KB，远超 C8T6 的 20K SRAM，只适合资源更充裕的平台。
+
+**反直觉发现**：48×48 的小模型反而比 96×96 更准（88.0% vs 85.7%）。
+crop 样本只有 371 张，输入越大越容易过拟合少数类。
+
+### 复现
+
+```bash
+python tools_crop_cls.py                # 按检测框裁 96x96 贴图
+python _toolchain/train_cls_int8_balanced.py --size 48 --out weed_cls_c8_int8
+python _toolchain/train_cls_int8_balanced.py --size 96 --out weed_cls_int8
+python _toolchain/eval_cls_int8.py --model models/weed_cls_c8_int8.tflite   # 逐类评估
+```
+
+> 评估一定要看**逐类**指标。整体准确率 98% 在 30:1 失衡数据上没有意义。
+
+---
+
 ## 📁 目录结构
 
 ```
@@ -188,7 +237,7 @@ python _toolchain/tflite_to_cc.py
 
 1. **本机环境**：`onnxruntime` / `tensorflow` / `litert` 在部分 Windows 虚拟化环境下加载原生库会段错误。项目部署走 **OpenCV DNN**，不依赖它们；ONNX 导出加 `--no-simplify` 可跳过 `onnxslim`。
 2. **AMP**：GTX 1660 SUPER 上 ultralytics AMP 自检未通过会自动降级 fp32，属正常现象。
-3. **int8 分类模型**：`models/weed_cls_*.tflite` 仍是交付包原有产物，**尚未**用新数据集重训。
+3. **int8 分类模型**：已用新数据集重训，见上文「int8 分类模型」章节。推荐 `weed_cls_c8_int8`（48×48）。
 
 ---
 

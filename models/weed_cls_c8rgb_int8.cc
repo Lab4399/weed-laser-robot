@@ -1,6 +1,6 @@
 #include "weed_cls_c8rgb_int8.h"
 // weed_cls_c8rgb_int8 int8 模型, 大小 14624 B
-const unsigned char g_weed_cls_c8rgb_int8_model[] = {
+const unsigned char g_weed_cls_c8rgb_model[] = {
 0x20,
 0x00,
 0x00,
@@ -14626,4 +14626,4 @@ const unsigned char g_weed_cls_c8rgb_int8_model[] = {
 0x00,
 0x03
 };
-const unsigned int g_weed_cls_c8rgb_int8_model_len = 14624;
+const unsigned int g_weed_cls_c8rgb_model_len = 14624;
