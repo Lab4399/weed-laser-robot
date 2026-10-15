@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="520" viewBox="0 0 760 520" font-family="Microsoft YaHei,SimHei,sans-serif">
+  <rect width="760" height="520" fill="#ffffff"/>
+  <text x="380" y="32" text-anchor="middle" font-size="20" font-weight="bold" fill="#1f2937">激光瞄准控制板（Arduino）—— 2 层 PCB 布局概念</text>
+
+  <!-- 板框 -->
+  <rect x="60" y="60" width="640" height="400" rx="16" fill="#1e3a5f" stroke="#0f172a" stroke-width="3"/>
+  <!-- 板框丝印标注 -->
+  <text x="380" y="500" text-anchor="middle" font-size="13" fill="#334155">尺寸约 40×28 mm（示例）· 蓝色阻焊 · 白丝印</text>
+
+  <!-- Arduino Nano 中心 -->
+  <rect x="255" y="150" width="230" height="120" rx="8" fill="#f59e0b" stroke="#78350f" stroke-width="2"/>
+  <text x="370" y="195" text-anchor="middle" font-size="16" fill="#7c2d12">Arduino Nano</text>
+  <text x="370" y="220" text-anchor="middle" font-size="12" fill="#78350f">DIP-30 · 5V/3.3V · UART</text>
+  <text x="370" y="245" text-anchor="middle" font-size="12" fill="#78350f">Servo + 激光控制</text>
+
+  <!-- 伺服1 水平 -->
+  <rect x="70" y="120" width="150" height="80" rx="8" fill="#34d399" stroke="#065f46" stroke-width="2"/>
+  <text x="145" y="152" text-anchor="middle" font-size="14" fill="#064e3b">伺服1 · 水平</text>
+  <text x="145" y="174" text-anchor="middle" font-size="12" fill="#064e3b">MG90S · D9/PWM</text>
+
+  <!-- 伺服2 俯仰 -->
+  <rect x="70" y="260" width="150" height="80" rx="8" fill="#34d399" stroke="#065f46" stroke-width="2"/>
+  <text x="145" y="292" text-anchor="middle" font-size="14" fill="#064e3b">伺服2 · 俯仰</text>
+  <text x="145" y="314" text-anchor="middle" font-size="12" fill="#064e3b">MG90S · D10/PWM</text>
+
+  <!-- 激光驱动 -->
+  <rect x="540" y="120" width="140" height="80" rx="8" fill="#f87171" stroke="#7f1d1d" stroke-width="2"/>
+  <text x="610" y="152" text-anchor="middle" font-size="14" fill="#7f1d1d">激光驱动</text>
+  <text x="610" y="174" text-anchor="middle" font-size="12" fill="#7f1d1d">MOS + 5mW 激光</text>
+
+  <!-- 5V 电源 -->
+  <rect x="540" y="260" width="140" height="80" rx="8" fill="#a3b18a" stroke="#3f6212" stroke-width="2"/>
+  <text x="610" y="292" text-anchor="middle" font-size="14" fill="#365314">电源 5V 输入</text>
+  <text x="610" y="314" text-anchor="middle" font-size="12" fill="#365314">DC 口/排针 · 1000uF</text>
+
+  <!-- 串口 -->
+  <rect x="255" y="320" width="230" height="70" rx="8" fill="#93c5fd" stroke="#1e40af" stroke-width="2"/>
+  <text x="370" y="350" text-anchor="middle" font-size="14" fill="#1e3a8a">串口 UART</text>
+  <text x="370" y="372" text-anchor="middle" font-size="12" fill="#1e3a8a">TX/RX · 115200 · 接 PC</text>
+
+  <!-- 连线（示意） -->
+  <line x1="220" y1="160" x2="255" y2="210" stroke="#e5e7eb" stroke-width="2"/>
+  <line x1="220" y1="300" x2="255" y2="240" stroke="#e5e7eb" stroke-width="2"/>
+  <line x1="485" y1="210" x2="540" y2="160" stroke="#e5e7eb" stroke-width="2"/>
+  <line x1="540" y1="310" x2="485" y2="260" stroke="#e5e7eb" stroke-width="2"/>
+
+  <!-- 关键设计提示 -->
+  <text x="380" y="455" text-anchor="middle" font-size="13" fill="#b91c1c">⚠ 舵机电流较大（~1A），建议舵机独立供电、与 MCU 共地分开电源</text>
+</svg>

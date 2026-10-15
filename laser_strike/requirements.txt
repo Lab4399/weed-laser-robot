@@ -1,0 +1,9 @@
+# 基础运行（blob 颜色病斑 + 仿真）
+opencv-python>=4.8
+numpy>=1.24
+
+# YOLO 检测模式
+ultralytics>=8.0
+
+# 串口真机（连 Arduino 云台）
+pyserial>=3.5

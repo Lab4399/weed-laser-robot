@@ -1,0 +1,57 @@
+# =====================================================================
+#  .gitignore —— 除草小车视觉识别项目
+#  原则：代码和文档进仓库；数据集/中间产物/大文件不进
+# =====================================================================
+
+# ---- 数据集（371 MB，可用 _toolchain/parquet2yolo.py 重新生成）----
+datasets/
+*.cache
+
+# ---- 训练输出：只保留权重，丢弃图表与缓存 ----
+runs/
+models/*/results.png
+models/*/labels.jpg
+models/*/train_batch*.jpg
+models/*/val_batch*.jpg
+models/*/confusion_matrix*.png
+models/*/Box*_curve.png
+
+# ---- 部署中间产物（可由 _toolchain/deploy_export.py 重新导出）----
+*.onnx
+export/pred/
+
+# ---- 冗余权重：基座模型 ultralytics 会自动下载；last.pt 是训练中间态 ----
+yolov8n.pt
+models/*/weights/last.pt
+models/verify_coco8/
+
+# ---- 根目录 best.pt 是交付包里的旧基线副本，与 models/best.pt(新模型) 同名易混淆 ----
+# 旧基线完整归档在 models/weed_det_orig_171img_20261007/ 与 best_orig_171img_20261007.pt
+/best.pt
+
+# ---- 日志 ----
+*.log
+logs/
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# ---- 模型工具链 ----
+*.mlmodel
+*.tflite.cache
+
+# ---- IDE / 系统 ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- 工作台本地数据（防止误提交本机路径与记忆文件）----
+.workbuddy/
+*.local.md
