@@ -38,6 +38,7 @@ import argparse
 import glob
 import math
 import os
+import time
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import numpy as np
@@ -145,16 +146,20 @@ def augment(x, rng):
 
 
 def tflite_predict(tflite, x):
+    """int8 推理：逐张调用（模型的输入张量固化为 batch=1，不能批量）"""
     it = tf.lite.Interpreter(model_content=tflite)
     it.allocate_tensors()
     ind, outd = it.get_input_details()[0], it.get_output_details()[0]
     isz, izp = ind['quantization'][0], ind['quantization'][1]
     osz, ozp = outd['quantization'][0], outd['quantization'][1]
+    in_idx, out_idx = ind['index'], outd['index']
     pred = np.empty(len(x), np.int32)
-    for i, s in enumerate(x):
-        b = np.clip(np.rint((s - izp) / isz), -128, 127).astype(np.int8)[None]
-        it.set_tensor(ind['index'], b); it.invoke()
-        o = it.get_tensor(outd['index']).astype(np.float32)
+    # 预先把整批量化好，避免每张重复算rint/clip
+    q = np.clip(np.rint((x.astype(np.float32) - izp) / isz), -128, 127).astype(np.int8)
+    for i in range(len(x)):
+        it.set_tensor(in_idx, q[i:i + 1])
+        it.invoke()
+        o = it.get_tensor(out_idx).astype(np.float32)
         pred[i] = int(((o - ozp) / osz).argmax())
     return pred
 
@@ -206,17 +211,26 @@ def main():
     per_fold = []
     last_tflite = None
 
+    # 一次性解码全部图像，5 折共用，避免重复 IO + 解码
+    t0 = time.time()
+    X_all = load_paths([p for p, _, _ in items], sz)
+    print(f'  已缓存 {len(items)} 张图像 @ {sz}x{sz}（耗时 {time.time()-t0:.1f}s）')
+    print(f'  内存占用 {X_all.nbytes/1048576:.0f} MB')
+    print()
+
     for k in range(a.folds):
         te_set = set(fold_paths[k])
         te_paths = fold_paths[k]
-        tr_paths = [p for i, f in enumerate(fold_paths) if i != k for p in f]
 
         # 用集合判定归属，避免 O(n^2) 的 in 列表扫描
-        tr_y = np.array([c for p, c, s in items if p not in te_set], np.int32)
-        te_y = np.array([c for p, c, s in items if p in te_set], np.int32)
+        tr_idx = np.array([j for j, (p, c, s) in enumerate(items) if p not in te_set])
+        te_idx = np.array([j for j, (p, c, s) in enumerate(items) if p in te_set])
+        tr_y = np.array([items[j][1] for j in tr_idx], np.int32)
+        te_y = np.array([items[j][1] for j in te_idx], np.int32)
 
-        x_tr = load_paths(tr_paths, sz)
-        x_te = load_paths(te_paths, sz)
+        # 从一次性缓存里切片，不再每折重新解码全部图像
+        x_tr = X_all[tr_idx]
+        x_te = X_all[te_idx]
 
         n0 = max(int((tr_y == 0).sum()), 1)
         n1 = max(int((tr_y == 1).sum()), 1)
@@ -228,20 +242,26 @@ def main():
                       metrics=['accuracy'])
 
         if a.augment:
-            # 手动增广： Minority 翻倍并做几何/光度扰动
+            # 手动增广：少数类做几何/光度扰动
             idx0 = np.where(tr_y == 0)[0]
             idx1 = np.where(tr_y == 1)[0]
-            # 只对数量多的一侧做增广，控制总量平衡，避免淹没少数类
-            n_aug = min(len(idx1) - len(idx0), len(idx0) * 3)
+            # 上限 2 倍而非 3 倍：crop 从 325到 975 已足够，
+            # 再多只会让每折训练时间翻倍而收益递减
+            n_aug = min(len(idx1) - len(idx0), len(idx0) * 2)
             if n_aug > 0:
+                t0 = time.time()
                 pick = rng.choice(idx0, size=n_aug, replace=True)
                 x_aug = augment(x_tr[pick], rng)
                 x_tr = np.concatenate([x_tr, x_aug])
                 tr_y = np.concatenate([tr_y, np.zeros(n_aug, np.int32)])
                 cw = {0: len(tr_y) / (2 * (n0 + n_aug)), 1: len(tr_y) / (2 * n1)}
+                print(f'      增广: +{n_aug} 张 crop（原{len(idx0)} -> {len(idx0)+n_aug}）'
+                      f' 耗时 {time.time()-t0:.1f}s')
 
+        t0 = time.time()
         model.fit(x_tr, tr_y, epochs=a.epochs, batch_size=32, verbose=0,
                   class_weight=cw)
+        t_train = time.time() - t0
 
         # ---- int8 量化后在测试折上评估 ----
         rep = tf.data.Dataset.from_tensor_slices(x_te[:64]).batch(1)
@@ -250,6 +270,7 @@ def main():
             for xb in rep:
                 yield [xb]
 
+        t0 = time.time()
         conv = tf.lite.TFLiteConverter.from_keras_model(model)
         conv.optimizations = [tf.lite.Optimize.DEFAULT]
         conv.representative_dataset = rep_gen
@@ -257,17 +278,23 @@ def main():
         conv.inference_input_type = tf.int8
         conv.inference_output_type = tf.int8
         tflite = conv.convert()
+        t_quant = time.time() - t0
         last_tflite = tflite
 
+        t0 = time.time()
         pred = tflite_predict(tflite, x_te)
-        cm = np.zeros((2, 2), np.int64)
-        for t, p in zip(te_y, pred):
-            cm[t, p] += 1
-        all_cm += cm
+        t_pred = time.time() - t0
+        # 用 bincount 累加混淆矩阵：比 np.add.at 快一个数量级
+        # （np.add.at 逐元素串行累加，7824 个样本要几十毫秒）
+        flat = te_y * 2 + pred
+        all_cm += np.bincount(flat, minlength=4).reshape(2, 2)
+        cm = np.bincount(flat, minlength=4).reshape(2, 2)
         bal = (cm[0, 0] / max(cm[0].sum(), 1) + cm[1, 1] / max(cm[1].sum(), 1)) / 2
         per_fold.append(bal)
         print(f'  折 {k+1}/{a.folds}: 测试 {len(te_y)} (crop {int((te_y==0).sum())})'
-              f'  平衡准确率 {bal:.1%}  tflite {len(tflite)} B')
+              f'  平衡准确率 {bal:.1%}  tflite {len(tflite)} B'
+              f'  [训练 {t_train:.0f}s 量化 {t_quant:.0f}s 推理 {t_pred:.0f}s]',
+              flush=True)
 
     # ---- 汇总 ----
     n_crop = int(all_cm[0].sum())
