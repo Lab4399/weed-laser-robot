@@ -45,6 +45,11 @@ env/
 *.mlmodel
 *.tflite.cache
 
+# ---- F407 固件构建工作区（HAL 源码 + 100 MB 目标文件）----
+#  第三方 HAL 不入库；可手工重写的集成层已归档在 _toolchain/f407_port/
+#  重建方式见 docs/F407固件构建与烧录.md
+_f407build/
+
 # ---- IDE / 系统 ----
 .vscode/
 .idea/
