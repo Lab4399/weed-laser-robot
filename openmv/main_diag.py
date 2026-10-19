@@ -386,8 +386,19 @@ def run():
         sensor.set_auto_exposure(False)
         # ★ 显式给值。缺这两行会导致画面严重偏暗（直方图全挤在暗部），
         #   色块 LAB 阈值随之全部失效。
-        sensor.set_gain_db(GAIN_DB)
-        sensor.set_exposure_us(EXPOSURE_US)
+        #
+        # ⚠️ API 版本差异（本机实测 OpenMV4-H7 v1.26.0）：
+        #    这个固件里 **没有** set_gain_db() / set_exposure_us()，
+        #    直接调用会抛 AttributeError，脚本连主循环都进不去 ——
+        #    串口上只能看到一句 "致命异常"，看起来像硬件坏了。
+        #    固定值必须作为关键字参数交给 set_auto_* 的关闭调用。
+        #    老固件（v3.x 及更早）支持独立 setter，故保留回退分支。
+        try:
+            sensor.set_auto_gain(False, gain_db=GAIN_DB)
+            sensor.set_auto_exposure(False, exposure_us=EXPOSURE_US)
+        except TypeError:
+            sensor.set_gain_db(GAIN_DB)
+            sensor.set_exposure_us(EXPOSURE_US)
 
     for _ in range(20):
         sensor.snapshot()
