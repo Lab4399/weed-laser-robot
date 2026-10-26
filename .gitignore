@@ -46,9 +46,15 @@ env/
 *.tflite.cache
 
 # ---- F407 固件构建工作区（HAL 源码 + 100 MB 目标文件）----
-#  第三方 HAL 不入库；可手工重写的集成层已归档在 _toolchain/f407_port/
+#  第三方 HAL、CubeMX 生成物、.o/.elf 不入库。
+#  但 **应用层源码必须入库**（2026-10-26 起）：_f407build/fw/app/ 约 178 KB，
+#  含 motor.c（L298N 安全修复）、safety.c、vision_proto.c 等全部自研代码。
+#  此前整目录被忽略，导致最关键的安全修复长期没有版本保护。
 #  重建方式见 docs/F407固件构建与烧录.md
-_f407build/
+_f407build/*
+!_f407build/fw
+_f407build/fw/*
+!_f407build/fw/app
 
 # ---- IDE / 系统 ----
 .vscode/
