@@ -205,9 +205,18 @@ Write-Step "4/5 版本标签"
 if ($Tag) {
     if ($Tag -notmatch '^v\d+\.\d+\.\d+$') { Write-Warn2 "标签建议使用 vX.Y.Z 格式" }
     $exists = Invoke-Git @('tag','-l',$Tag) -AllowFail
-    if ($exists) { Write-Fail "标签 $Tag 已存在，换一个版本号" }
-    Invoke-Git @('tag','-a',$Tag,'-m',$Tag) | Out-Null
-    Write-Ok "已打标签 $Tag"
+    if ($exists) {
+        $tagCommit = (Invoke-Git @('rev-list','-n','1',$Tag) -AllowFail).Trim()
+        $headCommit = (Invoke-Git @('rev-parse','HEAD') -AllowFail).Trim()
+        if ($tagCommit -eq $headCommit) {
+            Write-Warn2 "标签 $Tag 已存在且指向当前提交，直接复用并推送"
+        } else {
+            Write-Fail "标签 $Tag 已存在且指向其他提交（$tagCommit），请换一个版本号"
+        }
+    } else {
+        Invoke-Git @('tag','-a',$Tag,'-m',$Tag) | Out-Null
+        Write-Ok "已打标签 $Tag"
+    }
 } else {
     Write-Info "未指定 -Tag，跳过"
 }
