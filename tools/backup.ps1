@@ -20,9 +20,6 @@
 .PARAMETER DryRun
     只跑预检并展示将要提交的内容，不提交、不推送。
 
-.PARAMETER Force
-    跳过交互确认。
-
 .EXAMPLE
     .\tools\backup.ps1 "fix: 修正 motor 死区判定"
 
@@ -37,8 +34,7 @@ param(
     [Parameter(Position = 0)][string]$Message = "",
     [string]$Tag = "",
     [switch]$Both,
-    [switch]$DryRun,
-    [switch]$Force
+    [switch]$DryRun
 )
 
 $ErrorActionPreference = 'Stop'
